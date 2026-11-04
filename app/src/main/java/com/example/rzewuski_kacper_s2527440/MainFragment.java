@@ -20,17 +20,29 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Base64;
 
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
+import java.util.ArrayList;
+
 public class MainFragment extends Fragment implements View.OnClickListener {
     private android.widget.ListView listView;
     private Button startButton;
-    private java.util.ArrayList<TrafficSituation> situationsList = new java.util.ArrayList<>();
+    private android.widget.ProgressBar mProgressBar;
+    private TrafficViewModel viewModel;
 
+    // Klucze API
     final String clientId = "b1abd090-02e5-48e8-928d-021c75c22bc3";
     final String clientKey = "6wFkPp40MgOuDeopmzNOGtypnuLmBG2e-OPFB-48ezP3O17cb.kujUImRPavqaK-";
     final String unplannedEventsURL = "https://datex2.trafficscotland.org/rest/2.3/publications/UnplannedEvents/Content.xml";
 
-    public MainFragment() {
-    }
+    public MainFragment() {}
 
     @Nullable
     @Override
@@ -39,7 +51,26 @@ public class MainFragment extends Fragment implements View.OnClickListener {
 
         startButton = view.findViewById(R.id.startButton);
         listView = view.findViewById(R.id.listView);
+        mProgressBar = view.findViewById(R.id.bar1);
+        mProgressBar.setMax(100);
+
         startButton.setOnClickListener(this);
+
+        // ViewModel connection
+        viewModel = new ViewModelProvider(this).get(TrafficViewModel.class);
+
+        // Obserwowanie zmian w postępie
+        viewModel.getProgressData().observe(getViewLifecycleOwner(), progress -> {
+            mProgressBar.setProgress(progress);
+        });
+
+        // Obserwowanie pobranej listy sytuacji
+        viewModel.getSituationsData().observe(getViewLifecycleOwner(), situations -> {
+            if (situations != null) {
+                TrafficAdapter adapter = new TrafficAdapter(requireContext(), situations);
+                listView.setAdapter(adapter);
+            }
+        });
 
         return view;
     }
@@ -47,87 +78,8 @@ public class MainFragment extends Fragment implements View.OnClickListener {
     @Override
     public void onClick(View v) {
         if (v.getId() == R.id.startButton) {
-            new Thread(new Task(unplannedEventsURL)).start();
-        }
-    }
-
-    private class Task implements Runnable {
-        private String result = "";
-        private String myurl;
-        BufferedReader in = null;
-        String inputLine = "";
-
-        public Task(String aurl) {
-            myurl = aurl;
-        }
-
-        @Override
-        public void run() {
-            try {
-                URL url = new URL(myurl);
-                HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-                urlConnection.setRequestProperty("Authorization", Base64.getEncoder().encodeToString((clientId + ":" + clientKey).getBytes()));
-                try {
-                    in = new BufferedReader(new InputStreamReader(urlConnection.getInputStream()));
-                    while ((inputLine = in.readLine()) != null) {
-                        result = result + inputLine;
-                    }
-                    in.close();
-                } catch (IOException e) {
-                    Log.e("urlConnection", "ioexception");
-                } finally {
-                    urlConnection.disconnect();
-                }
-            } catch (IOException e) {
-                Log.e("URL", "ioexception");
-            }
-
-            int i = result.indexOf("<?");
-            if (i != -1) result = result.substring(i);
-
-            try {
-                XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
-                factory.setNamespaceAware(true);
-                XmlPullParser xpp = factory.newPullParser();
-                xpp.setInput(new StringReader(result));
-
-                int eventType = xpp.getEventType();
-                TrafficSituation currentSituation = null;
-                boolean isInsideComment = false;
-
-                while (eventType != XmlPullParser.END_DOCUMENT) {
-                    if (eventType == XmlPullParser.START_TAG) {
-                        if (xpp.getName().equalsIgnoreCase("situationRecord")) {
-                            currentSituation = new TrafficSituation();
-                            currentSituation.setRecordId(xpp.getAttributeValue(null, "id"));
-                        } else if (xpp.getName().equalsIgnoreCase("generalPublicComment")) {
-                            isInsideComment = true;
-                        } else if (xpp.getName().equalsIgnoreCase("value") && isInsideComment && currentSituation != null) {
-                            currentSituation.setGeneralPublicComment(xpp.nextText());
-                        }
-                    } else if (eventType == XmlPullParser.END_TAG) {
-                        if (xpp.getName().equalsIgnoreCase("generalPublicComment")) {
-                            isInsideComment = false;
-                        } else if (xpp.getName().equalsIgnoreCase("situationRecord") && currentSituation != null) {
-                            situationsList.add(currentSituation);
-                            currentSituation = null;
-                        }
-                    }
-                    eventType = xpp.next();
-                }
-            } catch (XmlPullParserException | IOException e) {
-                Log.e("Parsing", "Parsing error", e);
-            }
-
-            if (getActivity() == null) return;
-
-            listView.post(new Runnable() {
-                @Override
-                public void run() {
-                    TrafficAdapter adapter = new TrafficAdapter(requireContext(), situationsList);
-                    listView.setAdapter(adapter);
-                }
-            });
+            // Delegate task to ViewModel
+            viewModel.fetchTrafficData(unplannedEventsURL, clientId, clientKey);
         }
     }
 }
