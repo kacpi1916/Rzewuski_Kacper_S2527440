@@ -54,17 +54,26 @@ public class MainFragment extends Fragment implements View.OnClickListener {
         mProgressBar = view.findViewById(R.id.bar1);
         mProgressBar.setMax(100);
 
+        Button mapButton = view.findViewById(R.id.mapButton);
+        mapButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                android.content.Intent intent = new android.content.Intent(getActivity(), MapsActivity.class);
+                startActivity(intent);
+            }
+        });
         startButton.setOnClickListener(this);
 
         // ViewModel connection
         viewModel = new ViewModelProvider(this).get(TrafficViewModel.class);
 
-        // Obserwowanie zmian w postępie
+
         viewModel.getProgressData().observe(getViewLifecycleOwner(), progress -> {
             mProgressBar.setProgress(progress);
         });
 
-        // Obserwowanie pobranej listy sytuacji
+
         viewModel.getSituationsData().observe(getViewLifecycleOwner(), situations -> {
             if (situations != null) {
                 TrafficAdapter adapter = new TrafficAdapter(requireContext(), situations);

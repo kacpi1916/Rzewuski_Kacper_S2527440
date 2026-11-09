@@ -18,6 +18,14 @@
         android:layout_height="wrap_content"
         android:text="Press to get data" />
 
+    <Button
+        android:id="@+id/mapButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="8dp"
+        android:text="Show map" />
+
     <ProgressBar
         android:id="@+id/bar1"
         style="@android:style/Widget.ProgressBar.Horizontal"

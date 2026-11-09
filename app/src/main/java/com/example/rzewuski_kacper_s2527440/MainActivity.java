@@ -39,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
-        // Załadowanie fragmentu do pustego kontenera przy pierwszym uruchomieniu
+
         if (savedInstanceState == null) {
             getSupportFragmentManager().beginTransaction()
                     .replace(R.id.fragment_container, new MainFragment())
