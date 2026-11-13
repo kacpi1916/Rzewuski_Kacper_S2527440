@@ -20,6 +20,8 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.example.rzewuski_kacper_s2527440.databinding.ActivityMapsBinding;
 
+import java.util.ArrayList;
+
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, View.OnClickListener {
 
     private GoogleMap mMap;
@@ -84,13 +86,37 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
      * installed Google Play services and returned to the app.
      */
     @Override
-    public void onMapReady(GoogleMap googleMap) {
+    public void onMapReady(com.google.android.gms.maps.GoogleMap googleMap) {
         mMap = googleMap;
 
-        // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(-34, 151);
-        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
+
+        ArrayList<TrafficSituation> situationsList = (ArrayList<TrafficSituation>) getIntent().getSerializableExtra("situationsList");
+
+        if (situationsList != null && !situationsList.isEmpty()) {
+
+            for (TrafficSituation situation : situationsList) {
+                double lat = situation.getLatitude();
+                double lon = situation.getLongitude();
+
+
+                if (lat != 0.0 && lon != 0.0) {
+                    com.google.android.gms.maps.model.LatLng position = new com.google.android.gms.maps.model.LatLng(lat, lon);
+                    mMap.addMarker(new com.google.android.gms.maps.model.MarkerOptions()
+                            .position(position)
+                            .title(situation.getRecordId()));
+                }
+            }
+
+
+            double firstLat = situationsList.get(0).getLatitude();
+            double firstLon = situationsList.get(0).getLongitude();
+            com.google.android.gms.maps.model.LatLng firstLoc = new com.google.android.gms.maps.model.LatLng(firstLat, firstLon);
+            mMap.moveCamera(com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(firstLoc, 7.0f));
+        } else {
+
+            com.google.android.gms.maps.model.LatLng scotland = new com.google.android.gms.maps.model.LatLng(56.4907, -4.2026);
+            mMap.moveCamera(com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(scotland, 6.0f));
+        }
     }
 
     @Override

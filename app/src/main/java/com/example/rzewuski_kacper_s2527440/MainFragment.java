@@ -58,8 +58,13 @@ public class MainFragment extends Fragment implements View.OnClickListener {
         mapButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
                 android.content.Intent intent = new android.content.Intent(getActivity(), MapsActivity.class);
+
+                ArrayList<TrafficSituation> currentList = viewModel.getSituationsData().getValue();
+
+                if (currentList != null) {
+                    intent.putExtra("situationsList", currentList);
+                }
                 startActivity(intent);
             }
         });

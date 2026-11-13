@@ -27,8 +27,13 @@ public class TrafficViewModel extends ViewModel {
         progressData = new MutableLiveData<>();
     }
 
-    public LiveData<ArrayList<TrafficSituation>> getSituationsData() { return situationsData; }
-    public LiveData<Integer> getProgressData() { return progressData; }
+    public LiveData<ArrayList<TrafficSituation>> getSituationsData() {
+        return situationsData;
+    }
+
+    public LiveData<Integer> getProgressData() {
+        return progressData;
+    }
 
     public void fetchTrafficData(String myurl, String clientId, String clientKey) {
         new Thread(new Runnable() {
@@ -67,6 +72,7 @@ public class TrafficViewModel extends ViewModel {
                     TrafficSituation currentSituation = null;
                     boolean isInsideComment = false;
 
+
                     int totalItems = result.split("<situationRecord").length - 1;
                     if (totalItems <= 0) totalItems = 1;
                     final int step = 100 / totalItems;
@@ -77,10 +83,31 @@ public class TrafficViewModel extends ViewModel {
                             if (xpp.getName().equalsIgnoreCase("situationRecord")) {
                                 currentSituation = new TrafficSituation();
                                 currentSituation.setRecordId(xpp.getAttributeValue(null, "id"));
+
+
+                                for (int attrIndex = 0; attrIndex < xpp.getAttributeCount(); attrIndex++) {
+                                    if (xpp.getAttributeName(attrIndex).contains("type")) {
+                                        currentSituation.setType(xpp.getAttributeValue(attrIndex));
+                                        break;
+                                    }
+                                }
                             } else if (xpp.getName().equalsIgnoreCase("generalPublicComment")) {
                                 isInsideComment = true;
                             } else if (xpp.getName().equalsIgnoreCase("value") && isInsideComment && currentSituation != null) {
-                                currentSituation.setGeneralPublicComment(xpp.nextText());
+                                try {
+                                    currentSituation.setGeneralPublicComment(xpp.nextText());
+                                } catch (Exception e) {
+                                }
+                            } else if (xpp.getName().equalsIgnoreCase("latitude") && currentSituation != null) {
+                                try {
+                                    currentSituation.setLatitude(Double.parseDouble(xpp.nextText()));
+                                } catch (Exception e) {
+                                }
+                            } else if (xpp.getName().equalsIgnoreCase("longitude") && currentSituation != null) {
+                                try {
+                                    currentSituation.setLongitude(Double.parseDouble(xpp.nextText()));
+                                } catch (Exception e) {
+                                }
                             }
                         } else if (eventType == XmlPullParser.END_TAG) {
                             if (xpp.getName().equalsIgnoreCase("generalPublicComment")) {
@@ -90,16 +117,21 @@ public class TrafficViewModel extends ViewModel {
                                 currentSituation = null;
 
                                 currentProgress += step;
-                                progressData.postValue(currentProgress); // Wysłanie postępu do widoku
+                                progressData.postValue(currentProgress);
                             }
                         }
-                        eventType = xpp.next();
+                        try {
+                            eventType = xpp.next();
+                        } catch (Exception e) {
+                            break;
+                        }
                     }
-                    progressData.postValue(100);
-                    situationsData.postValue(situationsList); // Wysłanie gotowej listy do widoku
 
-                } catch (XmlPullParserException | IOException e) {
-                    Log.e("Parsing", "Parsing error", e);
+                    situationsData.postValue(situationsList);
+                    progressData.postValue(100);
+
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
             }
         }).start();
