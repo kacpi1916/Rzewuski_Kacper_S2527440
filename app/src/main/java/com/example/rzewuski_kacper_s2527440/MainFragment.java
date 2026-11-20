@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -14,6 +15,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -26,6 +28,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.util.ArrayList;
 import java.util.List;
+import android.location.Location;
 
 public class MainFragment extends Fragment implements OnMapReadyCallback {
 
@@ -39,6 +42,8 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
     private List<TrafficSituation> displayedSituations = new ArrayList<>();
     private ArrayAdapter<String> listAdapter;
     private final List<String> listItems = new ArrayList<>();
+    private EditText distanceEditText;
+    private Button distanceButton;
 
     @Nullable
     @Override
@@ -53,6 +58,8 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
 
         searchEditText = view.findViewById(R.id.searchEditText);
         searchButton = view.findViewById(R.id.searchButton);
+        distanceEditText = view.findViewById(R.id.distanceEditText);
+        distanceButton = view.findViewById(R.id.distanceButton);
         situationsListView = view.findViewById(R.id.situationsListView);
 
         // Setup ListView adapter
@@ -60,14 +67,17 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
         situationsListView.setAdapter(listAdapter);
 
         // Handle item click on the list: show details dialog and zoom map
-        situationsListView.setOnItemClickListener((parent, itemView, position, id) -> {
-            if (position >= 0 && position < displayedSituations.size()) {
-                TrafficSituation selected = displayedSituations.get(position);
-                showSituationDetails(selected);
+        situationsListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View itemView, int position, long id) {
+                if (position >= 0 && position < displayedSituations.size()) {
+                    TrafficSituation selected = displayedSituations.get(position);
+                    MainFragment.this.showSituationDetails(selected);
 
-                if (mMap != null && (selected.getLatitude() != 0.0 || selected.getLongitude() != 0.0)) {
-                    LatLng location = new LatLng(selected.getLatitude(), selected.getLongitude());
-                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(location, 12f));
+                    if (mMap != null && (selected.getLatitude() != 0.0 || selected.getLongitude() != 0.0)) {
+                        LatLng location = new LatLng(selected.getLatitude(), selected.getLongitude());
+                        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(location, 12f));
+                    }
                 }
             }
         });
@@ -83,11 +93,14 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
         viewModel = new ViewModelProvider(requireActivity()).get(TrafficViewModel.class);
 
         // 3. Observe traffic data
-        viewModel.getSituationsData().observe(getViewLifecycleOwner(), situations -> {
-            if (situations != null) {
-                allSituations = situations;
-                Toast.makeText(getContext(), "Loaded events: " + situations.size(), Toast.LENGTH_SHORT).show();
-                updateUI(allSituations);
+        viewModel.getSituationsData().observe(getViewLifecycleOwner(), new Observer<ArrayList<TrafficSituation>>() {
+            @Override
+            public void onChanged(ArrayList<TrafficSituation> situations) {
+                if (situations != null) {
+                    allSituations = situations;
+                    Toast.makeText(MainFragment.this.getContext(), "Loaded events: " + situations.size(), Toast.LENGTH_SHORT).show();
+                    MainFragment.this.updateUI(allSituations);
+                }
             }
         });
 
@@ -97,31 +110,76 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
                     "https://datex2.trafficscotland.org/rest/2.3/publications/UnplannedEvents/Content.xml",
                     "https://datex2.trafficscotland.org/rest/2.3/publications/CurrentRoadworks/Content.xml"
             };
-            viewModel.fetchTrafficData(
+            viewModel.startAutoRefresh(
                     urls,
-                    "b1abd090-02e5-48e8-928d-021c75c22bc3",
-                    "6wFkPp40MgOuDeopmzNOGtypnuLmBG2e-OPFB-48ezP3O17cb.kujUImRPavqaK-"
+                    BuildConfig.TRAFFIC_CLIENT_ID,
+                    BuildConfig.TRAFFIC_CLIENT_KEY,
+                    5
             );
         }
 
         // 5. Handle Search button
-        searchButton.setOnClickListener(v -> {
-            String query = searchEditText.getText().toString().trim().toLowerCase();
-            if (query.isEmpty()) {
-                updateUI(allSituations);
-                return;
-            }
+        searchButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String query = searchEditText.getText().toString().trim().toLowerCase();
+                if (query.isEmpty()) {
+                    MainFragment.this.updateUI(allSituations);
+                    return;
+                }
 
-            List<TrafficSituation> filtered = new ArrayList<>();
-            for (TrafficSituation situation : allSituations) {
-                if ((situation.getType() != null && situation.getType().toLowerCase().contains(query)) ||
-                        (situation.getGeneralPublicComment() != null && situation.getGeneralPublicComment().toLowerCase().contains(query))) {
-                    filtered.add(situation);
+                List<TrafficSituation> filtered = new ArrayList<>();
+                for (TrafficSituation situation : allSituations) {
+                    if ((situation.getType() != null && situation.getType().toLowerCase().contains(query)) ||
+                            (situation.getGeneralPublicComment() != null && situation.getGeneralPublicComment().toLowerCase().contains(query))) {
+                        filtered.add(situation);
+                    }
+                }
+
+                MainFragment.this.updateUI(filtered);
+                Toast.makeText(MainFragment.this.getContext(), "Found: " + filtered.size(), Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // 6. Handle Filter by Distance button (from Glasgow city centre)
+        distanceButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String distanceText = distanceEditText.getText().toString().trim();
+                if (distanceText.isEmpty()) {
+                    MainFragment.this.updateUI(allSituations);
+                    return;
+                }
+
+                try {
+                    double maxDistanceKm = Double.parseDouble(distanceText);
+                    double glasgowLat = 55.8642;
+                    double glasgowLng = -4.2518;
+
+                    List<TrafficSituation> filtered = new ArrayList<>();
+                    float[] results = new float[1];
+
+                    for (TrafficSituation situation : allSituations) {
+                        if (situation.getLatitude() == 0.0 && situation.getLongitude() == 0.0) {
+                            continue;
+                        }
+                        Location.distanceBetween(
+                                glasgowLat, glasgowLng,
+                                situation.getLatitude(), situation.getLongitude(),
+                                results
+                        );
+                        double distanceKm = results[0] / 1000.0;
+                        if (distanceKm <= maxDistanceKm) {
+                            filtered.add(situation);
+                        }
+                    }
+
+                    MainFragment.this.updateUI(filtered);
+                    Toast.makeText(MainFragment.this.getContext(), "Events within " + maxDistanceKm + " km: " + filtered.size(), Toast.LENGTH_SHORT).show();
+                } catch (NumberFormatException e) {
+                    Toast.makeText(MainFragment.this.getContext(), "Please enter a valid number", Toast.LENGTH_SHORT).show();
                 }
             }
-
-            updateUI(filtered);
-            Toast.makeText(getContext(), "Found: " + filtered.size(), Toast.LENGTH_SHORT).show();
         });
     }
 
@@ -173,6 +231,10 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
         mMap.clear();
 
         for (TrafficSituation situation : situations) {
+            if (situation.getLatitude() == 0.0 && situation.getLongitude() == 0.0) {
+                continue;
+            }
+
             LatLng position = new LatLng(situation.getLatitude(), situation.getLongitude());
             float markerColor = getMarkerColorForType(situation.getType());
 
@@ -183,7 +245,6 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
                     .icon(BitmapDescriptorFactory.defaultMarker(markerColor)));
         }
     }
-
     private float getMarkerColorForType(String type) {
         if (type == null) {
             return BitmapDescriptorFactory.HUE_AZURE;
@@ -203,4 +264,6 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
 
         return BitmapDescriptorFactory.HUE_AZURE;
     }
+
+
 }

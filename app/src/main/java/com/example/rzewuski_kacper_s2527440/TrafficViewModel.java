@@ -1,5 +1,6 @@
 package com.example.rzewuski_kacper_s2527440;
 
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.lifecycle.LiveData;
@@ -18,10 +19,15 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Base64;
 
+import android.os.Handler;
+
+
 public class TrafficViewModel extends ViewModel {
 
     private final MutableLiveData<ArrayList<TrafficSituation>> situationsData;
     private final MutableLiveData<Integer> progressData;
+    private final Handler refreshHandler = new Handler(Looper.getMainLooper());
+    private Runnable refreshRunnable;
 
     public TrafficViewModel() {
         situationsData = new MutableLiveData<>();
@@ -145,5 +151,34 @@ public class TrafficViewModel extends ViewModel {
             Log.e("Parser", "Error parsing XML", e);
         }
         return situationsList;
+    }
+
+    public void startAutoRefresh(String[] urls, String clientId, String clientKey, long intervalMinutes) {
+        stopAutoRefresh();
+
+        long intervalMillis = intervalMinutes * 60 * 1000;
+        refreshRunnable = new Runnable() {
+            @Override
+            public void run() {
+                Log.d("AutoRefresh", "Refreshing traffic data...");
+                fetchTrafficData(urls, clientId, clientKey);
+                refreshHandler.postDelayed(this, intervalMillis);
+            }
+        };
+
+        // Start immediately
+        refreshHandler.post(refreshRunnable);
+    }
+
+    public void stopAutoRefresh() {
+        if (refreshRunnable != null) {
+            refreshHandler.removeCallbacks(refreshRunnable);
+        }
+    }
+
+    @Override
+    protected void onCleared() {
+        super.onCleared();
+        stopAutoRefresh();
     }
 }
