@@ -10,10 +10,13 @@ import java.util.ArrayList;
 
 public class TrafficAdapter extends ArrayAdapter<TrafficSituation> {
 
+    // adapter for displaying traffic events with icons and duration colour bars
     public TrafficAdapter(Context context, ArrayList<TrafficSituation> situations) {
         super(context, 0, situations);
     }
 
+
+    // bind event data, icon, and duration indicator to a list row
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
         if (convertView == null) {

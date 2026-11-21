@@ -27,6 +27,7 @@ import java.util.Base64;
 
 public class MainActivity extends AppCompatActivity {
 
+    // load MainFragment into the container on initial launch
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

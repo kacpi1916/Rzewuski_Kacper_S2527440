@@ -6,7 +6,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
@@ -40,8 +39,8 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
 
     private List<TrafficSituation> allSituations = new ArrayList<>();
     private List<TrafficSituation> displayedSituations = new ArrayList<>();
-    private ArrayAdapter<String> listAdapter;
-    private final List<String> listItems = new ArrayList<>();
+    private TrafficAdapter listAdapter;
+    private final ArrayList<TrafficSituation> listItems = new ArrayList<>();
     private EditText distanceEditText;
     private Button distanceButton;
 
@@ -63,7 +62,7 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
         situationsListView = view.findViewById(R.id.situationsListView);
 
         // Setup ListView adapter
-        listAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_list_item_1, listItems);
+        listAdapter = new TrafficAdapter(getContext(), listItems);
         situationsListView.setAdapter(listAdapter);
 
         // Handle item click on the list: show details dialog and zoom map
@@ -82,17 +81,17 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
             }
         });
 
-        // 1. Initialize Google Map
+        // initialise Google Maps
         SupportMapFragment mapFragment = (SupportMapFragment) getChildFragmentManager()
                 .findFragmentById(R.id.map);
         if (mapFragment != null) {
             mapFragment.getMapAsync(this);
         }
 
-        // 2. Connect ViewModel
+        // connect ViewModel
         viewModel = new ViewModelProvider(requireActivity()).get(TrafficViewModel.class);
 
-        // 3. Observe traffic data
+        // observe traffic data
         viewModel.getSituationsData().observe(getViewLifecycleOwner(), new Observer<ArrayList<TrafficSituation>>() {
             @Override
             public void onChanged(ArrayList<TrafficSituation> situations) {
@@ -103,8 +102,16 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
                 }
             }
         });
+        viewModel.getErrorData().observe(getViewLifecycleOwner(), new Observer<String>() {
+            @Override
+            public void onChanged(String errorMessage) {
+                if (errorMessage != null && !errorMessage.isEmpty()) {
+                    Toast.makeText(MainFragment.this.getContext(), errorMessage, Toast.LENGTH_LONG).show();
+                }
+            }
+        });
 
-        // 4. Fetch both feeds on first launch
+        //  fetch both feeds on first launch
         if (viewModel.getSituationsData().getValue() == null) {
             String[] urls = {
                     "https://datex2.trafficscotland.org/rest/2.3/publications/UnplannedEvents/Content.xml",
@@ -118,7 +125,7 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
             );
         }
 
-        // 5. Handle Search button
+        // handle Search button
         searchButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -141,7 +148,7 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
             }
         });
 
-        // 6. Handle Filter by Distance button (from Glasgow city centre)
+        // handle filter by distance button
         distanceButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -183,11 +190,12 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
         });
     }
 
+    // displays map on Scotland
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
         mMap = googleMap;
 
-        // Default view centred on Scotland
+
         LatLng scotland = new LatLng(55.9533, -3.9);
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(scotland, 7f));
 
@@ -196,26 +204,39 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    // refresh map markers and the list view
     private void updateUI(List<TrafficSituation> situations) {
         displayedSituations = new ArrayList<>(situations);
         updateMapMarkers(displayedSituations);
         updateListView(displayedSituations);
     }
 
+    // update list data and refresh an adapter
     private void updateListView(List<TrafficSituation> situations) {
         listItems.clear();
-        for (TrafficSituation situation : situations) {
-            String type = situation.getType() != null ? situation.getType() : "Unknown Type";
-            String comment = situation.getGeneralPublicComment() != null ? situation.getGeneralPublicComment() : "No description available";
-            listItems.add(type + "\n" + comment);
-        }
+        listItems.addAll(situations);
         listAdapter.notifyDataSetChanged();
     }
 
+    // displays full event details
     private void showSituationDetails(TrafficSituation situation) {
+        String rawType = situation.getType() != null ? situation.getType() : "Unknown";
+        String displayType = rawType.contains(":") ? rawType.substring(rawType.indexOf(":") + 1) : rawType;
+
         StringBuilder details = new StringBuilder();
         details.append("Record ID: ").append(situation.getRecordId() != null ? situation.getRecordId() : "N/A").append("\n\n");
-        details.append("Type: ").append(situation.getType() != null ? situation.getType() : "Unknown").append("\n\n");
+        details.append("Type: ").append(displayType).append("\n\n");
+        details.append("Start Date: ").append(situation.getFormattedDate(situation.getStartTime())).append("\n");
+        details.append("End Date: ").append(situation.getFormattedDate(situation.getEndTime())).append("\n");
+
+        long days = situation.getDurationDays();
+        if (days == -1) {
+            details.append("Duration: Ongoing / Not specified\n\n");
+        } else {
+            String dayLabel = (days == 1) ? "1 day" : (days + " days");
+            details.append("Duration: ").append(dayLabel).append("\n\n");
+        }
+
         details.append("Description:\n").append(situation.getGeneralPublicComment() != null ? situation.getGeneralPublicComment() : "No details available").append("\n\n");
         details.append("Coordinates: ").append(situation.getLatitude()).append(", ").append(situation.getLongitude());
 
@@ -226,6 +247,7 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
                 .show();
     }
 
+    // add colour markers for current events
     private void updateMapMarkers(List<TrafficSituation> situations) {
         if (mMap == null) return;
         mMap.clear();
@@ -245,6 +267,8 @@ public class MainFragment extends Fragment implements OnMapReadyCallback {
                     .icon(BitmapDescriptorFactory.defaultMarker(markerColor)));
         }
     }
+
+    // returns a marker colour based on the event type
     private float getMarkerColorForType(String type) {
         if (type == null) {
             return BitmapDescriptorFactory.HUE_AZURE;
