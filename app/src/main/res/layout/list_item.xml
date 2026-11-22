@@ -1,22 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:padding="16dp"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="10dp"
+    android:gravity="center_vertical">
 
-    <TextView
-        android:id="@+id/textId"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textSize="12sp"
-        android:textStyle="italic"
-        android:textColor="#666666" />
+    <!-- Colour-coded duration bar -->
+    <View
+        android:id="@+id/viewDurationBar"
+        android:layout_width="6dp"
+        android:layout_height="match_parent"
+        android:minHeight="48dp"
+        android:layout_marginEnd="10dp"
+        android:background="#2196F3" />
 
-    <TextView
-        android:id="@+id/textComment"
-        android:layout_width="match_parent"
+    <!-- Event category icon -->
+    <ImageView
+        android:id="@+id/imageTypeIcon"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginEnd="10dp"
+        android:contentDescription="Event type icon"
+        android:src="@android:drawable/ic_dialog_info" />
+
+    <!-- Event text details -->
+    <LinearLayout
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:textSize="16sp"
-        android:layout_marginTop="4dp" />
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/textType"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:textColor="#212121" />
+
+        <TextView
+            android:id="@+id/textComment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="13sp"
+            android:textColor="#424242" />
+
+        <TextView
+            android:id="@+id/textDate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="11sp"
+            android:textColor="#757575" />
+    </LinearLayout>
+
 </LinearLayout>
